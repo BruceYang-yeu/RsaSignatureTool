@@ -31,8 +31,9 @@ CFLAGS                += $(CFLAGS-$(DEBUG))
 DFLAGS                += $(DFLAGS-$(DEBUG))
 LDFLAGS               += $(LDFLAGS-$(DEBUG)) 
 
-TARGETS += $(BUILD)/obj/key.o
-TARGETS += $(BUILD)/obj/pkcs1_rsa.o
+TARGETS += $(BUILD)/obj/UtilsInspurBase.o
+TARGETS += $(BUILD)/obj/KeyBase.o
+TARGETS += $(BUILD)/obj/RsaBase.o
 TARGETS += $(BUILD)/out/libgo.so
 TARGETS += $(BUILD)/out/$(NAME)
 
@@ -53,36 +54,51 @@ prep:
 clean:
 	@echo "    [clean] delete $(BUILD)/obj/*.o"
 	@echo "    [clean] delete $(BUILD)/out/$(NAME)"
-	rm -f $(BUILD)/obj/key.o
-	rm -f $(BUILD)/obj/pkcs1_rsa.o
+	rm -f $(BUILD)/obj/UtilsInspurBase.o
+	rm -f $(BUILD)/obj/RsaBase.o
+	rm -f $(BUILD)/obj/KeyBase.o
 	rm -f $(BUILD)/obj/main.o
 	rm -f $(BUILD)/out/sigtool
 
 #
-#   Key.o
+#   UtilsInspurBase.o
 #
-DEPS_1 += inc/key.h
-$(BUILD)/obj/key.o: \
-    src/key.cpp $(DEPS_1)
-	@echo '   [Compile] $(BUILD)/obj/key.o'
-	$(CC) -c -o $(BUILD)/obj/key.o $(CFLAGS) $(DFLAGS) -D_FILE_OFFSET_BITS=64   $(IFLAGS) src/key.cpp
+DEPS_1 += inc/UtilsInspurBase.h
+$(BUILD)/obj/UtilsInspurBase.o: \
+    src/UtilsInspurBase.cpp $(DEPS_1)
+	@echo '   [Compile] $(BUILD)/obj/UtilsInspurBase.o'
+	$(CC) -c -o $(BUILD)/obj/UtilsInspurBase.o $(CFLAGS) $(DFLAGS) -D_FILE_OFFSET_BITS=64   $(IFLAGS) src/UtilsInspurBase.cpp
 
 #
-#   pkcs1_rsa.o
+#   KeyBase.o
 #
-DEPS_2 += inc/key.h
-DEPS_2 += inc/pkcs1_rsa.h
+DEPS_2 += inc/KeyBase.h
 
-$(BUILD)/obj/pkcs1_rsa.o: \
-    src/pkcs1_rsa.cpp $(DEPS_2)
-	@echo '   [Compile] $(BUILD)/obj/pkcs1_rsa.o'
-	$(CC) -c -o $(BUILD)/obj/pkcs1_rsa.o $(CFLAGS) $(DFLAGS) -D_FILE_OFFSET_BITS=64   $(IFLAGS) src/pkcs1_rsa.cpp
+$(BUILD)/obj/KeyBase.o: \
+    src/KeyBase.cpp $(DEPS_2)
+	@echo '   [Compile] $(BUILD)/obj/KeyBase.o'
+	$(CC) -c -o $(BUILD)/obj/KeyBase.o $(CFLAGS) $(DFLAGS) -D_FILE_OFFSET_BITS=64   $(IFLAGS) src/KeyBase.cpp 
+
+#
+#   RsaBase.o
+#
+DEPS_5 += inc/RsaBase.h
+
+$(BUILD)/obj/RsaBase.o: \
+    src/RsaBase.cpp $(DEPS_5)
+	@echo '   [Compile] $(BUILD)/obj/RsaBase.o'
+	$(CC) -c -o $(BUILD)/obj/RsaBase.o $(CFLAGS) $(DFLAGS) -D_FILE_OFFSET_BITS=64   $(IFLAGS) src/RsaBase.cpp
 	
 #
 #   main.o
 #
 DEPS_3 += inc/osdep.h
-DEPS_3 += inc/pkcs1_rsa.h
+DEPS_3 += inc/UtilsInspurInterface.h
+DEPS_3 += inc/UtilsInspurBase.h
+DEPS_3 += inc/RsaInterface.h
+DEPS_3 += inc/RsaBase.h
+DEPS_3 += inc/KeyInterface.h
+DEPS_3 += inc/KeyBase.h
 
 $(BUILD)/obj/main.o: \
     src/main.cpp $(DEPS_3)
@@ -93,28 +109,40 @@ $(BUILD)/obj/main.o: \
 #
 #   libgo
 #
-DEPS_4 += inc/key.h
-DEPS_4 += inc/pkcs1_rsa.h
-DEPS_4 += $(BUILD)/obj/key.o
-DEPS_4 += $(BUILD)/obj/pkcs1_rsa.o
+DEPS_4 += inc/osdep.h
+DEPS_4 += inc/UtilsInspurInterface.h
+DEPS_4 += inc/UtilsInspurBase.h
+DEPS_4 += inc/RsaInterface.h
+DEPS_4 += inc/RsaBase.h
+DEPS_4 += inc/KeyInterface.h
+DEPS_4 += inc/KeyBase.h
+
+DEPS_4 += $(BUILD)/obj/KeyBase.o
+DEPS_4 += $(BUILD)/obj/UtilsInspurBase.o
+DEPS_4 += $(BUILD)/obj/RsaBase.o
 
 $(BUILD)/out/libgo.so: $(DEPS_4)
 	@echo '      [Link] $(BUILD)/out/libgo.so'
-	$(CC) -shared -o $(BUILD)/out/libgo.so $(LDFLAGS) $(LIBPATHS) "$(BUILD)/obj/key.o" "$(BUILD)/obj/pkcs1_rsa.o"   
+	$(CC) -shared -o $(BUILD)/out/libgo.so $(LDFLAGS) $(LIBPATHS) "$(BUILD)/obj/KeyBase.o" "$(BUILD)/obj/UtilsInspurBase.o" "$(BUILD)/obj/RsaBase.o"  
 	
 #
 #   sigtool
 #
 DEPS_5 += inc/osdep.h
-DEPS_5 += inc/key.h
-DEPS_5 += inc/pkcs1_rsa.h
+DEPS_5 += inc/UtilsInspurInterface.h
+DEPS_5 += inc/UtilsInspurBase.h
+DEPS_5 += inc/RsaInterface.h
+DEPS_5 += inc/RsaBase.h
+DEPS_5 += inc/KeyInterface.h
+DEPS_5 += inc/KeyBase.h
+
 DEPS_5 += $(BUILD)/obj/main.o
 
 LIBS_5 += -lgo
 LIBPATHS_5 += -L./out
 $(BUILD)/out/sigtool: $(DEPS_5)
 	@echo '      [Link] $(BUILD)/out/sigtool'
-	$(CC) -o $(BUILD)/out/sigtool $(LDFLAGS)  "$(BUILD)/obj/main.o"  "$(BUILD)/obj/key.o" "$(BUILD)/obj/pkcs1_rsa.o"   $(LIBPATHS) $(LIBS)
+	$(CC) -o $(BUILD)/out/sigtool $(LDFLAGS)  "$(BUILD)/obj/main.o" "$(BUILD)/obj/KeyBase.o" "$(BUILD)/obj/UtilsInspurBase.o" "$(BUILD)/obj/RsaBase.o"    $(LIBPATHS) $(LIBS)
 	
 help:
 	@echo '' >&2

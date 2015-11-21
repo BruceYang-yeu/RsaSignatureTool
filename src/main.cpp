@@ -1,18 +1,20 @@
-//
-//  main.cpp
-//  openssl
-//
-//  Created by Xinbao Dong on 15/4/4.
-//  Copyright (c) 2015年 com.dongxinbao. All rights reserved.
-//
-
 #include <iostream>
 #include <unistd.h>
 #include <errno.h>
-#include "pkcs1_rsa.h"
 #include "osdep.h"
 
+#include "UtilsInspurInterface.h"
+#include "UtilsInspurBase.h"
+#include "RsaInterface.h"
+#include "RsaBase.h"
+
 using namespace std;
+
+static void usage() ;
+static void AddNovelSupertvHeadV3(char *argv);
+static void GenerateNewKey(int num, unsigned long e, string PubkeyFile, string PriKeyFile);
+static void Signature(char *argv);
+static void Verify(char *argv);
 
 #define MALLOC_EXPANT 4096
 
@@ -21,7 +23,7 @@ int main(int argc,  char * argv[])
     int c;
 
     opterr = 0;
-    while ((c = getopt(argc, argv, "ga:e:d:s:v:")) != -1)
+    while ((c = getopt(argc, argv, "ga:s:v:")) != -1)
     {
      switch (c)
      {
@@ -39,14 +41,6 @@ int main(int argc,  char * argv[])
         break;
       case 'v':
         Verify(optarg);
-        goto End;
-        break;
-      case 'e':
-        Encryption(optarg, "publickey.pem", "privatekey.pem");
-        goto End;
-        break;
-      case 'd':
-        Decryption(optarg, "publickey.pem", "privatekey.pem");
         goto End;
         break;
       case '?':
@@ -74,7 +68,8 @@ static void PUBLIC
 AddNovelSupertvHeadV3(char *argv)
 {
     MovelSuperTvHead *mMovelSuperTvHead = NULL;
-    int ret = -1;
+    InspurUtilsBase *mInspurUtilsBase = NULL;
+    status_t ret;
     
     PRO_START_PRINT
     if(NULL == argv){
@@ -92,11 +87,10 @@ AddNovelSupertvHeadV3(char *argv)
         fprintf(stderr, "new error\n");
         exit(-1);
     }
-
-    RsaPkcs1Sign *rsa = new RsaPkcs1Sign();
-    ret = rsa->AddMovSuperTvHead(argv, mMovelSuperTvHead);
-
-    if (ret == 1/* condition */)
+    
+    mInspurUtilsBase = new InspurUtilsBase();
+    ret = mInspurUtilsBase->AddMovSuperTvHead(argv, mMovelSuperTvHead);
+    if (ret == NO_ERROR)
     {
         fprintf(stdout, "Add MovSuperTvHead V3 successfully!\n");
     }else{
@@ -104,21 +98,37 @@ AddNovelSupertvHeadV3(char *argv)
     }
 
     delete mMovelSuperTvHead;
+    delete mInspurUtilsBase;
     PRO_END_PRINT
 }
 
 static void PUBLIC 
 GenerateNewKey(int num, unsigned long e, string PubkeyFile, string PriKeyFile)
 {
-    Key *key = new Key(num, e);
-    key->generateNewKey(PubkeyFile, PriKeyFile);
+    RsaKeyBase *mRsaKeyBase;
+    status_t ret;
+    
+    mRsaKeyBase = new RsaKeyBase(num, e);
+    ret = mRsaKeyBase->generateNewKey(PubkeyFile, PriKeyFile);
+    if(ret == NO_ERROR){
+        cout<<PubkeyFile<<" And "<<PriKeyFile<<"Have been Saved."<<endl;
+    }else{
+        cout<<"generateNewKey Error!"<<endl;
+    }
+    
+    delete mRsaKeyBase;
 }
 static void PUBLIC
 Signature(char *argv)
 {
     const char *delim = " ";
     char *file = NULL, *KeyFile = NULL;
-    MovelSuperTvHead  *mMovelSuperTvHead = NULL;
+    //MovelSuperTvHead  *mMovelSuperTvHead = NULL;
+    status_t ret;
+    RsaKeyBase *mRsaKeyBase = NULL;
+    SignVerifyBase *mSignVerifyBase = NULL;
+    InspurUtilsBase *mInspurUtilsBase = NULL;
+    
 
     
     file = strtok(argv, delim);
@@ -135,12 +145,19 @@ Signature(char *argv)
     }
 
     string PriKeyFile(KeyFile);
-    Key *key = new Key(PriKeyFile, 1, 1);
-    RsaPkcs1Sign *rsa = new RsaPkcs1Sign(key);
+    string PubKeyFile = "";
+    mRsaKeyBase = new RsaKeyBase(PubKeyFile, PriKeyFile);
+    mSignVerifyBase = new SignVerifyBase();
+    ret = mSignVerifyBase->set(mRsaKeyBase);
+    if (ret != NO_ERROR){
+        cout<<"mSignVerifyBase set Failure"<<endl;
+        exit(-1);
+    }
+    mInspurUtilsBase = new InspurUtilsBase();
     PRO_START_PRINT
     printf("You selected KeyFile is:%s\n", KeyFile);
     printf("Reading the %s document to be signed…\n", file);
-    mMovelSuperTvHead = new MovelSuperTvHead;
+    //mMovelSuperTvHead = new MovelSuperTvHead;
     //rsa->AddMovSuperTvHead(file, mMovelSuperTvHead);
     FILE *originalFile = fopen(file, "rb");
     if (originalFile == NULL) {
@@ -170,20 +187,13 @@ Signature(char *argv)
 
     signatureLength = new unsigned int;
     
-    //signature = new unsigned char[sizeof(char) * originalSize  + MALLOC_EXPANT];
-    //memset(signature, 0, (sizeof(char) * originalSize + MALLOC_EXPANT));
-
-    /*    
-    if (rsa->mySign((unsigned char *)originalBuffer, originalSize, signature, signatureLength) <= 0) {
-        printf("Signature Error!\n");
-    }
-    */
-    if(rsa->Sign_Type3((unsigned char *)originalBuffer, originalSize, &signature, signatureLength))
+     ret = mSignVerifyBase->Sign((unsigned char *)originalBuffer, originalSize, &signature, signatureLength);
+     if (ret != NO_ERROR)
      {  printf("Signature Error!\n");
         exit(-1);
-     }
-
+     } 
     printf("signatureLength:%d\n", *signatureLength);
+    
 #ifdef DEBUG
     for(int i = 0; i < *signatureLength; i++) 
     { 
@@ -192,15 +202,22 @@ Signature(char *argv)
             printf("%02x ", *signature[i]); 
     } 
     printf("\n");
-#endif    
+#endif   
+    
     //save signature
-    rsa->AddSignHead(file, signature, *signatureLength);
+    ret = mInspurUtilsBase->AddSignHead(file, signature, *signatureLength);
+    if (ret == NO_ERROR)
+    {
+        fprintf(stdout, "Add SignHead successfully!\n");
+    }else{
+        fprintf(stdout, "Add SignHead Failure!\n");
+    } 
 
     free(originalBuffer);
-    //delete [] signature;
     free(signature);
-    delete mMovelSuperTvHead;
     delete signatureLength;
+    delete mSignVerifyBase;
+    delete mInspurUtilsBase;
     printf("Signature successful, signature length is% d, total length is% d," 
            "after signature file has been saved.\n", 
             *signatureLength, *signatureLength + originalSize);    
@@ -213,6 +230,9 @@ Verify(char *argv)
     const char *delim = " ";
     char *file = NULL, *KeyFile = NULL;
     unsigned int mDefSignaLen = 256;
+    status_t ret;
+    RsaKeyBase *mRsaKeyBase = NULL;
+    SignVerifyBase *mSignVerifyBase = NULL;
     
     file = strtok(argv, delim);
     KeyFile = strtok(NULL, delim);
@@ -227,8 +247,15 @@ Verify(char *argv)
     }
    
     string PubKeyFile(KeyFile);
-    Key *key = new Key(PubKeyFile, 1);
-    RsaPkcs1Sign *rsa = new RsaPkcs1Sign(key);
+    string PriKeyFile = "";
+    mRsaKeyBase = new RsaKeyBase(PubKeyFile, PriKeyFile);
+    mSignVerifyBase = new SignVerifyBase();
+    ret = mSignVerifyBase->set(mRsaKeyBase);
+    if (ret != NO_ERROR){
+        cout<<"mSignVerifyBase set Failure"<<endl;
+        exit(-1);
+    }
+    
     PRO_START_PRINT
     //Extraction last 256 signatures
     FILE *signatureFile = fopen(file, "rb");
@@ -255,10 +282,9 @@ Verify(char *argv)
     unsigned char *originalBuffer = (unsigned char*)malloc(sizeof(char) * originalSize + MALLOC_EXPANT);
     memcpy(originalBuffer, buffer + mDefSignaLen, originalSize);
     //Verify
-    printf("\033[1;32;40mVerifying signatures…\033[0m\n");
-    //int res = rsa->myVerify(buffer, 256, originalBuffer, originalSize);       
-    unsigned long res = rsa->Verify_Type3(originalBuffer, originalSize, buffer, mDefSignaLen);
-    if (res == 0) {
+    printf("\033[1;32;40mVerifying signatures…\033[0m\n");      
+    ret = mSignVerifyBase->Verify(originalBuffer, originalSize, buffer, mDefSignaLen);
+    if (ret == NO_ERROR) {
         printf("\033[1;34;40mVerifying signatures successful!\033[0m\n");
     } else {
         printf("\033[1;35;40mVerifying signatures failure!\033[0m\n");
@@ -266,118 +292,6 @@ Verify(char *argv)
     free(originalBuffer);
     free(buffer);
     PRO_END_PRINT
-}
-
-static void PUBLIC 
-Encryption(char *file, string PubkeyFile, string PriKeyFile)
-{
-    Key *key = new Key(PubkeyFile, PriKeyFile);
-    RsaPkcs1Sign *rsa = new RsaPkcs1Sign(key);
-    //load the signed file
-    FILE *File = fopen(file, "rb");
-    if (File == NULL) {
-        printf("file not exits!\n");
-        exit(0);
-    }
-    fseek(File, 0, SEEK_END);
-    unsigned int FileSize = ftell(File);
-    rewind(File);
-    unsigned char * inBuffer = (unsigned char *)malloc(sizeof(char) * FileSize);
-    if (inBuffer == NULL) {
-        printf("Memory Error!\n");
-        exit(0);
-    }
-    if (fread(inBuffer, 1, FileSize, File) != FileSize) {
-        printf("Signed File load error!\n");
-        exit(0);
-    }
-    fclose(File);
-    printf("Cryptographic signature file…\n");
-    //encrypt and save
-    FILE *outFile = fopen("encryptedFile.out", "wb");
-    if (outFile == NULL) {
-        printf("Create encrypted file error!\n");
-        exit(0);
-    }
-    
-    key->reload();
-    unsigned int encryptedLength =  RSA_size(key->publicKey);
-    unsigned char *encryptedBuffer = (unsigned char *)malloc(sizeof(char) * encryptedLength);
-    unsigned int i = 0;
-    while (i < FileSize) {
-        if (rsa->myEncrypt((unsigned char *)(inBuffer + i), 100, encryptedBuffer, encryptedLength) <= 0) {
-            printf("Signed File encrypt error!\n");
-            exit(0);
-        }
-        fwrite(encryptedBuffer, 1, encryptedLength, outFile);
-        i +=  100;              //100为单位加密，其实只要小于128-11就行了。
-    }
-
-    fclose(outFile);
-    free(encryptedBuffer);
-    free(inBuffer);
-    printf("Encryption is successful, the length of%d，"
-           "has been saved to fileSigned.encrypted\n", FileSize / 100 * 128);
-}
-
-static void PUBLIC
-Decryption(char *file, string PubkeyFile, string PriKeyFile)
-{
-    Key *key = new Key(PubkeyFile, PriKeyFile);
-    RsaPkcs1Sign *rsa = new RsaPkcs1Sign(key);
-    
-    printf("Decrypt the encrypted file…\n");
-    //decrypt the file
-    FILE* encryptedFile = fopen(file, "rb");
-    if (encryptedFile == NULL) {
-        printf("Encryped file not exits!\n");
-        exit(0);
-    }
-    fseek(encryptedFile, 0, SEEK_END);
-    unsigned int encryptedLength = ftell(encryptedFile);
-    rewind(encryptedFile);
-    unsigned char *encryptedBuffer = (unsigned char *)malloc(sizeof(char) * encryptedLength);
-    if (encryptedBuffer == NULL) {
-        printf("Memory Error!\n");
-        exit(0);
-    }
-    if (fread(encryptedBuffer, 1, encryptedLength, encryptedFile) != encryptedLength) {
-        printf("Encrypted File load error!\n");
-        exit(0);
-    }
-    fclose(encryptedFile);
-    
-    FILE *decryptedFile = fopen("decryptedFile.out", "wb");
-    if (decryptedFile == NULL) {
-        printf("Create decrypted file error!\n");
-        exit(0);
-    } 
-    //save the uncrypted data to file
-    key->reload();
-    unsigned int decryptionLen = RSA_size(key->publicKey);
-    unsigned char *plain = (unsigned char *)malloc(sizeof(char) * decryptionLen);
-    unsigned int i = 0, y = 0;
-    while (i < encryptedLength) 
-    {
-        y = rsa->myDecrypt((unsigned char *)encryptedBuffer + i, 128, plain, decryptionLen);
-        
-        //去除空格
-        if (i + 128 >= encryptedLength) {
-            y = 100;
-            while (plain[y - 1] == 0) {
-                y --;
-                if (y == 0) {
-                    break ;
-                }
-            }
-        }
-        fwrite(plain, 1, y, decryptedFile);
-        i += 128;
-    }
-    fclose(decryptedFile);
-    free(encryptedBuffer);
-    free(plain);
-    printf("Decryption is successful\n");
 }
 
 static void usage() {

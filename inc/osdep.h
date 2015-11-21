@@ -1,6 +1,11 @@
 #ifndef __OSDEP_FILE__
 #define __OSDEP_FILE__
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+
 #undef PUBLIC
 #undef PUBLIC_DATA
 #undef PRIVATE
@@ -34,10 +39,10 @@
 #endif
 
 #ifndef max
-    #define max(a,b)  (((a) > (b)) ? (a) : (b))
+    #define max_ (a,b)  (((a) > (b)) ? (a) : (b))
 #endif
 #ifndef min
-    #define min(a,b)  (((a) < (b)) ? (a) : (b))
+    #define min_(a,b)  (((a) < (b)) ? (a) : (b))
 #endif
 
 #ifndef PRO_START_PRINT
@@ -54,12 +59,34 @@
 	#define DEBUG_HELP
 #endif
 
-static void usage() ;
-static void AddNovelSupertvHeadV3(char *argv);
-static void GenerateNewKey(int num, unsigned long e, string PubkeyFile, string PriKeyFile);
-static void Signature(char *argv);
-static void Verify(char *argv);
-static void Encryption(char *file, string PubkeyFile, string PriKeyFile);
-static void Decryption(char *file, string PubkeyFile, string PriKeyFile);
+#ifndef ANDROID
+
+#define status_t int
+#define BAD_VALUE -1
+#define NO_ERROR  0
+
+/* error codes */
+#define BAD_DATA  1
+#define GENERATOR_ERROR  2
+#define KEY_GEN_ERROR 3
+#define MEM_ALLOC_ERROR 4
+#define STRING_SET_ERROR 5
+#define BUF_SHORT 6
+
+/* verification errors */
+#define SELF_SIGN_OR_PATH 7
+#define CERT_EXPIRED 8
+#define CA_INVALID 9
+#define SIGN_ERROR 10
+#define VERIFY_ERROR 11
+#define  OK 0
+#define  SHA_DIGEST_LENGTH  20
+
+#endif
+
+
+typedef unsigned char uint8_t;
+typedef unsigned int  uint32_t __attribute__ ((aligned (8)));
+typedef long long int64_bit;
 
 #endif /* defined(__OSDEP_FILE__) */
